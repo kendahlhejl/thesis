@@ -1,0 +1,44 @@
+#!/bin/bash
+#level 1 cube processing using ISIS commands lronac2isis, spiceinit, lronacecho
+echo Level 1 Cube Processing 
+#lronac2isis
+ls *.IMG | sed s\.IMG\\ > level_1_batch.lis
+lronac2isis from=\$1.IMG to=\$1.cub -batchlist=level_1_batch.lis
+#spiceinit
+spiceinit from=\$1.cub web=yes -batchlist=level1_cubes.lis spksmithed=yes
+#lronacecho
+lronacecho from=\$1.cub to=\$1_echo.cub -batchlist=level1_cubes.lis
+
+#!/bin/bash
+# LRO NAC Level 1 Batch Processing of Cubes w Trim
+# chmod 755
+echo LRO NAC Level 1 Batch Processing of Cubes With Trim
+# trim left
+ls *le_echo.cub | sed s/_echo.cub// > lfg_left_cube_trim.lis
+trim from=\$1.cub to=\$1.tr.cub left=46 right=26 -batchlist=lfg_left_cube_trim.lis
+# trim right
+ls *re_echo.cub | sed s/_echo.cub// > lfg_right_cube_trim.lis
+trim from=\$1.cub to=\$1.tr.cub left=26 right=46 -batchlist=lfg_right_cube_trim.lis
+
+
+#!/bin/bash
+# LRO NAC Level 2 Batch Processing of Trimmed Images
+# chmod 755
+echo LRO NAC Level 2 Batch Processing of Trimmed Images
+ls *.tr.cub | sed s/.tr.cub// > lfg_cube_map.lis
+cam2map from=\$1.tr.cub to=\$1_map.cub map=/home/nqe1/miniconda3/envs/isis/data/base/templates/maps/polarstereographic.map
+pixres=camera defaultrange=map minlat=-85.89920 maxlat=-84.97630 minlon=36.50144 maxlon=43.22853 trim=yes interp=nearestneighbor
+warpalgorithm=automatic -batchlist=lfg_cube_map.lis
+
+
+#!/bin/bash
+echo Batch Process Campt command on map projected image files
+ls *_map.cub | sed s/_map.cub// > map_files_campt.lis
+campt from=\$1_map.cub to=\$1_mapt.PVL -batchlist=map_files_campt.lis
+
+#!/bin/bash
+# Loop
+for file in *"_map.cub"; do
+        # Run gdal_translate command on each file
+        gdal_translate -ot Int8 -of GTiff -scale "$file" "${file/_map.cub/.tif}"
+done
